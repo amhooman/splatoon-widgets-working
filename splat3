@@ -1,0 +1,194 @@
+let json = await loadJson()
+let merchandiseJson = await loadMerchandiseJson()
+let widget = await createWidget(json)
+
+// Check if the script is running in a widget. If not, show a preview of the widget to easier debug it
+if (!config.runsInWidget) {
+  await widget.presentMedium()
+}
+
+// Tell the system to show the widget
+Script.setWidget(widget)
+Script.complete()
+
+// Generate widget
+async function createWidget(json) {
+  
+    var stageCount = 2
+
+    let dateFormatter = new DateFormatter()
+    dateFormatter.useShortDateStyle()
+    dateFormatter.useShortTimeStyle()
+      
+    let relativeDateFormatter = new RelativeDateTimeFormatter()
+    relativeDateFormatter.useNumericDateTimeStyle()
+
+    let bgColor = "#ff5600"
+          
+    // Create widget frame
+    let w = new ListWidget()
+    w.setPadding(8, 8, 8, 8)
+    w.backgroundColor = new Color(bgColor)
+
+    // Display Stage 1 image as the background
+    let bgImage = new Request('https://splatoon3.ink\/assets\/img\/bg-spots.fc2fe88f.png')
+    let retrvBgImage = await bgImage.loadImage()
+    w.backgroundImage = retrvBgImage
+
+    //
+    // TITLE
+    //
+
+    let titleStack = w.addStack()
+    titleStack.spacing = 5
+
+    // Logo
+    let logoReq = new Request('https://splatoon3.ink\/assets\/img\/mr-grizz.a87af81b.png')
+    let logoImage = await logoReq.loadImage()
+    let logo = titleStack.addImage(logoImage)
+    logo.imageSize = new Size(20, 20)
+
+    let modeTxt = titleStack.addText('Salmon Run')
+    modeTxt.font = Font.boldRoundedSystemFont(20)
+    modeTxt.textColor = Color.white()
+
+    let gear = merchandiseJson["coop"]["reward_gear"]["gear"]
+    let gearImageUrl = 'https://splatoon3.ink\/assets\/splatnet'+gear.image
+    let gearImageReq = new Request(gearImageUrl)
+    let gearImage = await gearImageReq.loadImage()
+
+    titleStack.addSpacer()
+    
+    let gearContainer = titleStack.addStack()
+    gearContainer.backgroundColor = new Color("FFFFFF55")
+    gearContainer.setPadding(2,2,2,2)
+    gearContainer.cornerRadius = 4
+    gearContainer.centerAlignContent()
+    let gearImageDisplay = gearContainer.addImage(gearImage)
+    gearImageDisplay.imageSize = new Size(20, 20)
+
+    w.addSpacer()
+    
+    let schedulesStack = w.addStack()
+    schedulesStack.layoutVertically()
+    schedulesStack.spacing = 5
+
+    //
+    // STAGES
+    //
+
+    let now = Date.now()
+
+    let schedules = json["details"]
+    for (i=0; i<schedules.length; i++) {
+
+        let schedule = schedules[i]
+
+        let stageStack = schedulesStack.addStack()
+        stageStack.spacing = 5
+
+        const stage = schedule.stage
+        const stageName = stage.name
+        const stageImgUrl = stage.image
+
+        let imageContainer = stageStack.addStack()
+        imageContainer.layoutVertically()
+
+        let stageReq = new Request('https:splatoon3.ink/assets/splatnet' + stageImgUrl)
+        let stageImage = await stageReq.loadImage()
+        imageContainer.cornerRadius = 10
+        imageContainer.backgroundImage = stageImage
+        imageContainer.size = new Size(100,50)
+        imageContainer.setPadding(5, 5, 5, 5)
+        imageContainer.topAlignContent()
+
+        // Stage info
+        let stageInfoStack = stageStack.addStack()
+        stageInfoStack.layoutVertically()
+
+        // Time display
+        let startDate = new Date(schedule.start_time * 1000)
+        let endDate = new Date(schedule.end_time * 1000)
+        let startDateText = dateFormatter.string(startDate)
+        let endDateText = dateFormatter.string(endDate)
+        let isOpen = (schedule.start_time * 1000) < now && now < (schedule.end_time * 1000)
+        let isSoon = now < (schedule.start_time * 1000)
+
+        if (i == 0) {
+            let isOpenStack = imageContainer.addStack()    // container
+            isOpenStack.backgroundColor = new Color("00000055")
+            isOpenStack.cornerRadius = 2
+              isOpenStack.setPadding(1, 1, 1, 1)
+            let text = isSoon ? 'Soon' : 'Open'
+            let isOpenTxt = isOpenStack.addText(text)
+            isOpenTxt.font = Font.boldRoundedSystemFont(10)
+            isOpenTxt.textColor = Color.white()
+
+            imageContainer.addSpacer()
+        }
+        if (isSoon) {
+
+            imageContainer.addSpacer()
+
+            let relativeStartDateDisplay = imageContainer.addDate(startDate)
+            relativeStartDateDisplay.font = Font.boldRoundedSystemFont(11)
+            relativeStartDateDisplay.textColor = Color.white()
+            relativeStartDateDisplay.lineLimit = 1
+            relativeStartDateDisplay.minimumScaleFactor = 0.5
+            relativeStartDateDisplay.applyRelativeStyle()
+        }
+
+        let stageNameTxt = stageInfoStack.addText(stageName)
+        stageNameTxt.font = Font.boldRoundedSystemFont(14)
+        stageNameTxt.textColor = Color.white()
+
+        let timeStack = stageInfoStack.addStack()
+        let stageDateTxt = timeStack.addText(startDateText + ' - ' + endDateText)
+        stageDateTxt.font = Font.boldRoundedSystemFont(12)
+        stageDateTxt.textColor = Color.white()
+        stageDateTxt.lineLimit = 2
+        stageDateTxt.minimumScaleFactor = 0.8
+
+            
+        let stageWeaponsStack = stageInfoStack.addStack()
+        stageWeaponsStack.spacing = 5
+        let stageWeapons = schedule.weapons
+        for (j=0; j<stageWeapons.length; j++) {
+            let weaponDetails = stageWeapons[j]
+            let weapon = weaponDetails.weapon != null ? weaponDetails.weapon : (weaponDetails.coop_special_weapon != null ? weaponDetails.coop_special_weapon : null)
+            if (weapon != null) {
+                var weaponURL = 'https://splatoon3.ink\/assets\/splatnet' + weapon.image
+                if (weapon.image.startsWith("assets")) {
+                    weaponURL = 'https://splatoon3.ink\/' + weapon.image
+                }
+                let weaponReq = new Request(weaponURL)
+                let weaponImage = await weaponReq.loadImage()
+                weaponImageDisplay = stageWeaponsStack.addImage(weaponImage)
+                weaponImageDisplay.imageSize = new Size(24, 24)
+            }
+        }
+
+    }
+
+    return w
+}
+
+//Load the Splatoon 2 Schedule JSON
+async function loadJson() {
+    let url = "https://splatoon3.ink\/data\/coop-schedules.json"
+    let req = new Request(url)
+    let textres = await req.loadString()
+    let json = JSON.parse(textres)
+    return json
+}
+
+
+//Load the Splatoon 2 Salmon Run Timeline JSON
+async function loadMerchandiseJson() {
+    let url = "https://splatoon3.ink\/data\/timeline.json"
+    let req = new Request(url)
+    let textres = await req.loadString()
+    let json = JSON.parse(textres)
+    return json
+}
+",
